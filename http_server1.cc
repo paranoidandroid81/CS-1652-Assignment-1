@@ -164,9 +164,11 @@ int handle_connection(int sock) {
             if (ok) {
                    /* send headers */
                    fseek(fp, 0, SEEK_END);      //go to EOF
-                   contentLength = ftell(fp);   //store length of file
-                   char ok_response_full [strlen(ok_response_f) + 1];
+                   contentLength = ftell(fp);   //store length of fil
                    //stores OK response with content length using format string
+                   //uses snprintf() to find necessary length
+                   int len = snprintf(NULL, 0, ok_response_f, contentLength);
+                   char ok_response_full [len + 1];
                    sprintf(ok_response_full, ok_response_f, contentLength);
                    writeStatus = minet_write(sock, ok_response_full, strlen(ok_response_full));
                    if (writeStatus < 0) {
