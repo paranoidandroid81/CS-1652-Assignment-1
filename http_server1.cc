@@ -164,7 +164,7 @@ int handle_connection(int sock) {
             if (ok) {
                    /* send headers */
                    fseek(fp, 0, SEEK_END);      //go to EOF
-                   contentLength = ftell(fp);   //store length of fil
+                   contentLength = ftell(fp);   //store length of file
                    //stores OK response with content length using format string
                    //uses snprintf() to find necessary length
                    int len = snprintf(NULL, 0, ok_response_f, contentLength);
