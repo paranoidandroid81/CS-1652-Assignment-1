@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <string>
 
 #define BUFSIZE 1024
 #define FILENAMESIZE 100
@@ -91,7 +92,7 @@ int main(int argc, char * argv[]) {
         }
         rc = handle_connection(sock2);
         if (rc < 0) {
-            fprintf(stderr, "Error handling connection\n", );
+            fprintf(stderr, "Error handling connection\n");
        }
     }
     minet_close(sock);      //exited loop, closing accept socket
@@ -164,7 +165,7 @@ int handle_connection(int sock) {
             if (ok) {
                    /* send headers */
                    fseek(fp, 0, SEEK_END);      //go to EOF
-                   contentLength = ftell(fp);   //store length of file
+                   contentLength = ftell(fp);   //store length of fil
                    //stores OK response with content length using format string
                    //uses snprintf() to find necessary length
                    int len = snprintf(NULL, 0, ok_response_f, contentLength);
