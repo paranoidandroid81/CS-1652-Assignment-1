@@ -134,7 +134,7 @@ int handle_connection(int sock) {
         //Tab and new line indicate end of header, need to find
         matched = request.find("\r\n\r\n"); //holds either pos or npos
         if (matched != std::string::npos) {   //sequence found
-            request = request.substr(0, found); //store header
+	    request = request.substr(0, matched); //store header
             found = true;       //read was a success
             break;          //no more need to loop
         }
