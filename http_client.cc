@@ -1,9 +1,10 @@
 #include "minet_socket.h"
 #include <stdlib.h>
+#include <netinet/in.h>
 #include <ctype.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <fstream>
+#include <iostream>
 #include <string>
 
 #define BUFSIZE 1024
@@ -26,11 +27,9 @@ int main(int argc, char * argv[]) {
     server_port = atoi(argv[3]);
     server_path = argv[4];
 
-    int path_len = strlen("GET  HTTP/1.0\r\n\r\n")
-			 + strlen(server_path);
-    req = (char *)malloc(path_len + 1);
-      buffer[buff_len + 8] = '\0'; //Null terminate string
-
+    int path_len = strlen("GET  HTTP/1.0\r\n\r\n") + strlen(server_path);
+    req = (char *)calloc(path_len + 1, sizeof(char));
+	
     /* initialize */
     if (toupper(*(argv[1])) == 'K') {
 	minet_init(MINET_KERNEL);
@@ -52,7 +51,7 @@ int main(int argc, char * argv[]) {
     struct sockaddr_in hostsockaddr;
     hostsockaddr.sin_family = AF_INET;
     hostsockaddr.sin_port = htons(server_port);
-    hostsockaddr.sin_addr.s_addr = hostentry->h_addr;
+    hostsockaddr.sin_addr.s_addr = inet_addr(hostentry->h_addr);
     /* set address */
 
     /* connect to the server socket */
@@ -64,7 +63,7 @@ int main(int argc, char * argv[]) {
     /* send request message */
     sprintf(req, "GET %s HTTP/1.0\r\n\r\n", server_path);
 
-    if (minet_write(min_sock, req, strlen(req)) {
+    if (minet_write(min_sock, req, strlen(req))) {
       //TODO: handle error!
     }
 
@@ -73,15 +72,12 @@ int main(int argc, char * argv[]) {
     FD_SET(min_sock, &readfds);
     /* wait till socket can be read. */
 
-
     if(minet_select(min_sock + 1, &readfds, NULL, NULL, NULL) < 1) {
       //TODO: error handling
     }
     /* Hint: use select(), and ignore timeout for now. */
 
-    char * buffer = calloc(BUFSIZE + 8);
-    //Read from socket until blank line!
-    char ch = '';
+    char * buffer = (char*)calloc(BUFSIZE + 1, sizeof(char));
 
     /* first read loop -- read headers */
 
@@ -89,7 +85,7 @@ int main(int argc, char * argv[]) {
     if (buff_len < 1) {
           //TODO: Error handling!
     }
-    buffer[buff_len + 8] = '\0'; //Null terminate string
+    buffer[buff_len] = '\0'; //Null terminate string
         //DO some regex stuff here?
 
     std::string response(buffer);
@@ -107,7 +103,7 @@ int main(int argc, char * argv[]) {
     else {
       //Something went wrong!
     }
-    cout << header; //Print header
+    std::cout << header; //Print header
 
     // Normal reply has return code 200
 
@@ -115,7 +111,7 @@ int main(int argc, char * argv[]) {
 
     //Read from end of header, skipping \r\n\r\n
     std::string body = response.substr(head_end + 4);
-    cout << body;
+    std::cout << body;
 
     /* second read loop -- print out the rest of the response: real web content */
 
