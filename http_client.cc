@@ -40,40 +40,27 @@ int main(int argc, char * argv[]) {
 	exit(-1);
     }
 
-    /* make socket */
     int min_sock = minet_socket(SOCK_STREAM);
 
-    /* get host IP address  */
     struct hostent *hostentry = gethostbyname(server_name);
 
-    /* Hint: use gethostbyname() */
     struct sockaddr_in hostsockaddr;
     hostsockaddr.sin_family = AF_INET;
     hostsockaddr.sin_port = htons(server_port);
-    //hostsockaddr.sin_addr.s_addr = inet_addr(hostentry->h_addr);
     memcpy((void *)&(hostsockaddr.sin_addr.s_addr),(void *)hostentry->h_addr, sizeof(hostentry->h_addr));
-    /* set address */ 
 
     /* connect to the server socket */
     if (minet_connect(min_sock, &hostsockaddr) < 0) {
-      //TODO: Handle error!!!!
       fprintf(stderr, "Failed at connect");
       exit(-1);
     }
-    std::cout << "Connected to the yaw" << std::endl;
 
-    /* send request message */
     sprintf(req, "GET %s HTTP/1.0\r\n\r\n", server_path);
 
-    //std::cout << "Request is " << req << std::endl;
-
     if (minet_write(min_sock, req, path_len) < path_len) {
-      //TODO: handle error!
-      std::cout << "Oh no, wheres the yaw?" << std::endl;
+	  minet_perror("Error: Could not write full HTTP request");
       exit(-1);
     }
-
-    std::cout << "Wrote some yaw" << std::endl;    
 
     fd_set readfds;
     FD_ZERO(&readfds);
@@ -81,10 +68,9 @@ int main(int argc, char * argv[]) {
     /* wait till socket can be read. */
 
     if(minet_select(min_sock + 1, &readfds, NULL, NULL, NULL) < 1) {
-      //TODO: error handling
-      fprintf(stderr, "got nothing from select!");
+      std:: cout << "Got nothing from select!" << std::endl;
+	  exit(-1);
     }
-    /* Hint: use select(), and ignore timeout for now. */
 
     char * buffer = (char*)calloc(BUFSIZE + 1, sizeof(char));
 
@@ -92,28 +78,26 @@ int main(int argc, char * argv[]) {
 
     int buff_len = minet_read(min_sock, buffer, BUFSIZE);
     if (buff_len < 1) {
-          //TODO: Error handling!
+        std::cout << "Could not read http header!" << std::endl;
+		exit(-1);
     }
     
-   // buffer[(int)buff_len] = '\0'; //Null terminate string
-        //DO some regex stuff here?
-
     std::string response(buffer);
-    //Parse up to end of header
-    std::size_t head_end = response.find("\r\n\r\n");
-    // std::cout << buffer << std::endl;
-    // std::cout << response << std::endl;
 
-    std::string header = response.substr(9, head_end);
+    std::string header = response.substr(9);
+	//std::string header = response.substr(9, head_end);
+
     /* examine return code */
     //Skip "HTTP/1.0"
     //remove the '\0'
 
     if (header.substr(0, 3).compare("200") == 0) {
       //The request was a success!
+	  std::cout << "The request was a success!" << std::endl;
     }
     else {
       //Something went wrong!
+	  std::cout << "FAILURE!" << std::endl;
     }
     std::cout << header << std::endl; //Print header
 
@@ -125,29 +109,29 @@ int main(int argc, char * argv[]) {
 	
 	FD_ZERO(&readfds);
     FD_SET(min_sock, &readfds);
-	memset(buffer, '\0', sideof(char) * 1025);
+	memset(buffer, '\0', sizeof(char) * 1025);
 	
+	/* second read loop -- print out the rest of the response: real web content */
     while(minet_select(min_sock + 1, &readfds, NULL, NULL, NULL) > 0){
+		
 		if (!FD_ISSET(min_sock, &readfds)){
-			//TODO: handle error!!!
+			std::cout << "There was an error reading from the server socket!" << std::endl;
+			exit(-1);
 		}
 		
 		buff_len = minet_read(min_sock, buffer, BUFSIZE);
-		
 		if (buff_len < 1) {
-          //TODO: Error handling!
+			std::cout << "Could not read from the HTTP server!" << std::endl;
+			exit(-1);
 		}
 		std::cout << buffer << std::endl;
 		FD_ZERO(&readfds);
 		FD_SET(min_sock, &readfds);
 		memset(buffer, '\0', sideof(char) * 1025);
 	}
-    std::string body = response.substr(head_end);
-    std::cout << body << std::endl;
-
-    /* second read loop -- print out the rest of the response: real web content */
-
-    ok = minet_close(min_sock) && minet_deinit();
+    
+	ok = (minet_close(min_sock) > 0);
+	minet_deinit();
     /*close socket and deinitialize */
 
     if (ok) {
