@@ -155,6 +155,7 @@ int handle_connection(int sock) {
             //to end of name found by subtracting 5 from total length
             //before "HTTP"
             std::string fileTemp = request.substr(4, (matched - 5));
+	    fileTemp = "./" + fileTemp;
             strncpy(filename, fileTemp.c_str(), sizeof(filename));
             /* try opening the file */
             FILE *fp = fopen(filename, "r");
