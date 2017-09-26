@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <string>
+#include <vector>
 
 #define BUFSIZE 1024
 #define FILENAMESIZE 100
@@ -19,6 +20,7 @@ int main(int argc, char * argv[]) {
     int rc          =  0;
     int sock        = -1;           //var for accept socket
     int sock2       = -1;          //var for connection socket
+	int packets;
 
     /* parse command line args */
     if (argc != 3) {
@@ -60,8 +62,8 @@ int main(int argc, char * argv[]) {
     netaddr.sin_family = AF_INET;       //using IPv4
     netaddr.sin_addr.s_addr = htonl(INADDR_ANY); //sets IP in network byte order
     netaddr.sin_port = htons(server_port);    //sets port in network byte order
-
-    /* bind listening socket */
+	
+	/* bind listening socket */
     bindStatus = minet_bind(sock, &netaddr);
     if (bindStatus < 0) {
         minet_perror("Error binding socket");
@@ -79,22 +81,57 @@ int main(int argc, char * argv[]) {
         exit(-1);
     }
 
+	fd_set readfds;
+	std::vector<int> active_socks (0);
+	int max_sock = sock; 
+	int cli_sock;
+	int new_sock;
+	int min_err;
+	int connections;
+	
 
     /* connection handling loop: wait to accept connection */
 
     while (1) {
-        /* handle connections */
-        //accept connection from client
-        sock2 = minet_accept(sock, NULL);    //address info not needed
-        if (sock2 < 0) {
-            minet_perror("Error accepting connection");
-            continue;           //continues looping for new connection
-        }
-        rc = handle_connection(sock2);
-        if (rc < 0) {
-            fprintf(stderr, "Error handling connection\n");
-       }
+		
+		FD_ZERO(&readfds);
+		FD_SET(sock, &readfds);
+		int i;
+		
+		for (i = 0; i < active_socks.size(); i++) {
+			cli_sock = active_socks.at(i);
+			FD_SET(cli_sock, &readfds);
+			if (cli_sock > max_sock) max_sock = cli_sock;
+		}      
+		if ( packets = minet_select(max_sock + 1, &readfds, NULL, NULL, NULL) =< 0 ) break;
+
+		if (FD_ISSET(sock, &readfds)) {
+			//Add new connection!
+			new_sock = minet_accept(sock, NULL);
+			if (new_sock < 0) {
+				min err = minet_perror("Error accepting a new socket!");
+			}
+			active_socks.push_back(new_sock);
+		}
+		
+		if (--packets > 0) {
+			connections = active_socks.size();
+			for (i = 0; i < active_socks.size(); i++) {
+				cli_sock = active_socks.at(i);
+				if (FD_ISSET(cli_sock, &readfds)) {
+					if (handle_connection(cli_sock) < 0) {
+						min_err = minet_perror("Error handling client connection");
+						printf("Errno %d, client %d", min_err, i);
+					}
+	
+					active_socks.erase(i);
+					connections--;
+				}
+				if (--packets == 0) break;
+			}
+		}
     }
+	
     minet_close(sock);      //exited loop, closing accept socket
     fprintf(stderr, "Server exited unexpectedly\n");
     minet_deinit();         //shutdown Minet stack
