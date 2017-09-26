@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #define BUFSIZE 1024
 #define FILENAMESIZE 100
@@ -17,11 +18,9 @@ int main(int argc, char * argv[]) {
     int listenStatus;        //holds status of listen
 
     int server_port = -1;
-    int rc          =  0;
     int sock        = -1;           //var for accept socket
-    int sock2       = -1;          //var for connection socket
-	int packets;
-
+    int rc          =  0;
+ 
     /* parse command line args */
     if (argc != 3) {
         fprintf(stderr, "usage: http_server1 k|u port\n");
@@ -81,55 +80,52 @@ int main(int argc, char * argv[]) {
         exit(-1);
     }
 
-	fd_set readfds;
-	std::vector<int> active_socks (0);
-	int max_sock = sock; 
-	int cli_sock;
-	int new_sock;
-	int min_err;
-	int connections;
+    fd_set readfds;
+    fd_set master;  //one fd_set for checking reads, one master to track all
+    FD_ZERO(&readfds);         //initially zeroes reads and master
+    FD_ZERO(&master);
+    int max_sock = sock; //accept socket is initially highest socket
+    int new_sock;
+    FD_SET(sock, &master);     //add listen sock to master
+    int i;
 	
 
     /* connection handling loop: wait to accept connection */
 
     while (1) {
-		
-		FD_ZERO(&readfds);
-		FD_SET(sock, &readfds);
-		int i;
-		
-		for (i = 0; i < active_socks.size(); i++) {
-			cli_sock = active_socks.at(i);
-			FD_SET(cli_sock, &readfds);
-			if (cli_sock > max_sock) max_sock = cli_sock;
-		}      
-		if ( packets = minet_select(max_sock + 1, &readfds, NULL, NULL, NULL) =< 0 ) break;
-
-		if (FD_ISSET(sock, &readfds)) {
-			//Add new connection!
-			new_sock = minet_accept(sock, NULL);
-			if (new_sock < 0) {
-				min err = minet_perror("Error accepting a new socket!");
-			}
-			active_socks.push_back(new_sock);
-		}
-		
-		if (--packets > 0) {
-			connections = active_socks.size();
-			for (i = 0; i < active_socks.size(); i++) {
-				cli_sock = active_socks.at(i);
-				if (FD_ISSET(cli_sock, &readfds)) {
-					if (handle_connection(cli_sock) < 0) {
-						min_err = minet_perror("Error handling client connection");
-						printf("Errno %d, client %d", min_err, i);
-					}
-	
-					active_socks.erase(i);
-					connections--;
-				}
-				if (--packets == 0) break;
-			}
-		}
+      readfds = master; //copy master socket list into reads
+      if (minet_select(max_sock + 1, &readfds, NULL, NULL, NULL) < 0) {
+	minet_perror("Error selecting socket");
+	exit(-1);
+      }
+      
+      //iterate through all connections looking for data to read
+      for (i = 0; i <= max_sock; i++) {
+	if (FD_ISSET(i, &readfds)) {       //found socket to read
+	  if (i == sock) {   //on accept socket, must accept new connection
+	    new_sock = minet_accept(sock, NULL);
+	    if (new_sock < 0) {
+	      minet_perror("Error accepting socket");
+	    } else {
+	      FD_SET(new_sock, &master);    //add to master
+	      if (new_sock > max_sock) {    //track highest socket
+		max_sock = new_sock;
+	      }
+	    }
+	  } else {
+	    //receiving data from client
+	    rc = handle_connection(i);
+	    if (rc < 0) {
+	      fprintf(stderr, "Error handling connection\n");
+	    }
+	    minet_close(i);
+          //close socket and clear from open sockets
+	    FD_CLR(i, &master);
+	  }
+	} else {
+	  continue;   //go to next socket as not ready for read
+        }
+      }
     }
 	
     minet_close(sock);      //exited loop, closing accept socket

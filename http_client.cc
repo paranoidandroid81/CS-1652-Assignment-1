@@ -85,22 +85,8 @@ int main(int argc, char * argv[]) {
     std::string response(buffer);
 
     std::string header = response.substr(9);
-	//std::string header = response.substr(9, head_end);
 
-    /* examine return code */
-    //Skip "HTTP/1.0"
-    //remove the '\0'
-
-    if (header.substr(0, 3).compare("200") == 0) {
-      //The request was a success!
-	  std::cout << "The request was a success!" << std::endl;
-    }
-    else {
-      //Something went wrong!
-	  std::cout << "FAILURE!" << std::endl;
-    }
-    std::cout << header << std::endl; //Print header
-
+    ok = (header.substr(0, 3).compare("200") == 0);
     // Normal reply has return code 200
 
     /* print first part of response: header, error code, etc. */
@@ -120,23 +106,17 @@ int main(int argc, char * argv[]) {
 		}
 		
 		buff_len = minet_read(min_sock, buffer, BUFSIZE);
-		if (buff_len < 1) {
-			std::cout << "Could not read from the HTTP server!" << std::endl;
-			exit(-1);
-		}
+		if (buff_len < 1) break;
+		
 		std::cout << buffer << std::endl;
 		FD_ZERO(&readfds);
 		FD_SET(min_sock, &readfds);
-		memset(buffer, '\0', sideof(char) * 1025);
+		memset(buffer, '\0', sizeof(char) * 1025);
 	}
     
 	ok = (minet_close(min_sock) > 0);
 	minet_deinit();
     /*close socket and deinitialize */
 
-    if (ok) {
-	return 0;
-    } else {
-	return -1;
-    }
+    return (ok ? 0 : -1);
 }
